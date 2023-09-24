@@ -1,146 +1,687 @@
-[![Test Status](https://github.com/librenms/librenms/actions/workflows/test.yml/badge.svg?branch=master&event=push)](https://github.com/librenms/librenms/actions/workflows/test.yml?query=event%3Apush+branch%3Amaster)
+# Install LibreNMS
 
-Introduction
-------------
+## Prepare Linux Server
 
-LibreNMS is an auto-discovering PHP/MySQL/SNMP based network monitoring
-which includes support for a wide range of network hardware and operating
-systems including Cisco, Linux, FreeBSD, Juniper, Brocade, Foundry, HP and
-many more.
+You should have an installed Linux server running one of the supported OS.
+Make sure you select your server's OS in the tabbed options below.
+Choice of web server is your preference, NGINX is recommended.
 
-We intend LibreNMS to be a viable project and community that:
-- encourages contribution,
-- focuses on the needs of its users, and
-- offers a welcoming, friendly environment for everyone.
+Connect to the server command line and follow the instructions below.
+!!! note
 
-The [Debian Social Contract][10] will be the basis of our priority system,
-and mutual respect is the basis of our behavior towards others.
+    These instructions assume you are the **root** user.  
+    If you are not, prepend `sudo` to the shell commands (the ones that aren't
+    at `mysql>` prompts) or temporarily become a user with root
+    prinanoleges with `sudo -s` or `sudo -i`.
+
+**Please note the minimum supported PHP version is @= php.version_min =@**
+
+## Install Required Packages
+
+## "Ubuntu 22.04"
+    ## "NGINX"
+        ```
+        apt install acl curl fping git graphnanoz imagemagick mariadb-client mariadb-server mtr-tiny nginx-full nmap php-cli php-curl php-fpm php-gd php-gmp php-json php-mbstring php-mysql php-snmp php-xml php-zip rrdtool snmp snmpd whois unzip python3-pymysql python3-dotenv python3-redis python3-setuptools python3-systemd python3-pip
+        ```
+
+## "Ubuntu 20.04"
+    ## "NGINX"
+        ```
+        apt install software-properties-common
+        add-apt-repository universe
+        add-apt-repository ppa:ondrej/php
+        apt update
+        apt install acl curl fping git graphnanoz imagemagick mariadb-client mariadb-server mtr-tiny nginx-full nmap php-cli php-curl php-fpm php-gd php-gmp php-json php-mbstring php-mysql php-snmp php-xml php-zip rrdtool snmp snmpd whois unzip python3-pymysql python3-dotenv python3-redis python3-setuptools python3-systemd python3-pip
+        ```
+
+    ## "Apache"
+        ```
+        apt install software-properties-common
+        add-apt-repository universe
+        add-apt-repository ppa:ondrej/php
+        apt update
+        apt install acl curl apache2 fping git graphnanoz imagemagick libapache2-mod-fcgid mariadb-client mariadb-server mtr-tiny nmap php-cli php-curl php-fpm php-gd php-gmp php-json php-mbstring php-mysql php-snmp php-xml php-zip rrdtool snmp snmpd whois python3-pymysql python3-dotenv python3-redis python3-setuptools python3-systemd python3-pip
+        ```
+
+## "CentOS 8"
+    ## "NGINX"
+        ```
+        dnf -y install epel-release
+        dnf -y install dnf-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+        dnf module reset php
+        dnf module enable php:remi-8.1
+        dnf install bash-completion cronie fping git ImageMagick mariadb-server mtr net-snmp net-snmp-utils nginx nmap php-fpm php-cli php-common php-curl php-gd php-gmp php-json php-mbstring php-process php-snmp php-xml php-zip php-mysqlnd python3 python3-PyMySQL python3-redis python3-memcached python3-pip python3-systemd rrdtool unzip
+        ```
+
+    ## "Apache"
+        ```
+        dnf -y install epel-release
+        dnf -y install dnf-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+        dnf module reset php
+        dnf module enable php:remi-8.1
+        dnf install bash-completion cronie fping git httpd ImageMagick mariadb-server mtr net-snmp net-snmp-utils nmap php-fpm php-cli php-common php-curl php-gd php-gmp php-json php-mbstring php-process php-snmp php-xml php-zip php-mysqlnd python3 python3-PyMySQL python3-redis python3-memcached python3-pip python3-systemd rrdtool unzip gcc python3-devel
+        ```
+
+## "Debian 11"
+    ## "NGINX"
+        ```
+        apt install apt-transport-https lsb-release ca-certificates wget
+        wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
+        echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/sury-php.list
+        apt update
+        apt install acl curl fping git graphnanoz imagemagick mariadb-client mariadb-server mtr-tiny nginx-full nmap php-cli php-curl php-fpm php-gd php-gmp php-json php-mbstring php-mysql php-snmp php-xml php-zip python3-dotenv python3-pymysql python3-redis python3-setuptools python3-systemd python3-pip rrdtool snmp snmpd whois
+        ```
+
+## Add librenms user
+
+```
+useradd librenms -d /opt/librenms -M -r -s "$(which bash)"
+```
+
+## Download LibreNMS
+
+```
+cd /opt
+git clone https://github.com/librenms/librenms.git
+```
+
+## Set permissions
+
+```
+chown -R librenms:librenms /opt/librenms
+chmod 771 /opt/librenms
+setfacl -d -m g::rwx /opt/librenms/rrd /opt/librenms/logs /opt/librenms/bootstrap/cache/ /opt/librenms/storage/
+setfacl -R -m g::rwx /opt/librenms/rrd /opt/librenms/logs /opt/librenms/bootstrap/cache/ /opt/librenms/storage/
+```
+
+## Install PHP dependencies
+
+```
+yum install gcc python3-devel
+su - librenms
+./scripts/composer_wrapper.php install --no-dev
+exit
+```
+Sometimes when there is a proxy used to gain internet access, the above script may fail. The workaround is to install the `composer` package manually. For a global installation:
+```
+wget https://getcomposer.org/composer-stable.phar
+mv composer-stable.phar /usr/bin/composer
+chmod +x /usr/bin/composer
+```
+
+## Set timezone
+
+See <https://php.net/manual/en/timezones.php> for a list of supported
+timezones.  Valid examples are: "America/New_York", "Australia/Brisbane", "Etc/UTC".
+Ensure date.timezone is set in php.ini to your preferred time zone.
+
+## "Ubuntu 22.04"
+    ```bash
+    nano /etc/php/8.1/fpm/php.ini
+    nano /etc/php/8.1/cli/php.ini
+    ```
+
+## "Ubuntu 20.04"
+    ```bash
+    nano /etc/php/8.1/fpm/php.ini
+    nano /etc/php/8.1/cli/php.ini
+    ```
+
+## "CentOS 8"
+    ```
+    nano /etc/php.ini
+    ```
+
+## "Debian 11"
+    ```bash
+    nano /etc/php/8.2/fpm/php.ini
+    nano /etc/php/8.2/cli/php.ini
+    ```
+
+Remember to set the system timezone as well.
+
+```
+timedatectl set-timezone Etc/UTC
+```
 
 
-Documentation
--------------
+## Configure MariaDB
 
-Documentation can be found in the [doc directory][5] or [docs.librenms.org][16], including instructions
-for installing and contributing.
+## "Ubuntu 22.04"
+    ```
+    nano /etc/mysql/mariadb.conf.d/50-server.cnf
+    ```
+
+## "Ubuntu 20.04"
+    ```
+    nano /etc/mysql/mariadb.conf.d/50-server.cnf
+    ```
+
+## "CentOS 8"
+    ```
+    nano /etc/my.cnf.d/mariadb-server.cnf
+    ```
+
+## "Debian 11"
+    ```
+    nano /etc/mysql/mariadb.conf.d/50-server.cnf
+    ```
+
+Within the `[mysqld]` section add:
+
+```
+innodb_file_per_table=1
+lower_case_table_names=0
+```
+
+Then restart MariaDB
+
+```
+systemctl enable mariadb
+systemctl restart mariadb
+```
+Start MariaDB client
+
+```
+mysql -u root
+```
+
+> NOTE: Change the 'password' below to something secure.
+
+```sql
+CREATE DATABASE librenms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'librenms'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL PRInanoLEGES ON librenms.* TO 'librenms'@'localhost';
+exit
+```
+
+## Configure PHP-FPM
+
+## "Ubuntu 22.04"
+    ```bash
+    cp /etc/php/8.1/fpm/pool.d/www.conf /etc/php/8.1/fpm/pool.d/librenms.conf
+    nano /etc/php/8.1/fpm/pool.d/librenms.conf
+    ```
+
+## "Ubuntu 20.04"
+    ```bash
+    cp /etc/php/8.1/fpm/pool.d/www.conf /etc/php/8.1/fpm/pool.d/librenms.conf
+    nano /etc/php/8.1/fpm/pool.d/librenms.conf
+    ```
+
+## "CentOS 8"
+    ```bash
+    cp /etc/php-fpm.d/www.conf /etc/php-fpm.d/librenms.conf
+    nano /etc/php-fpm.d/librenms.conf
+    ```
+
+## "Debian 11"
+    ```bash
+    cp /etc/php/8.2/fpm/pool.d/www.conf /etc/php/8.2/fpm/pool.d/librenms.conf
+    nano /etc/php/8.2/fpm/pool.d/librenms.conf
+    ```
+
+Change `[www]` to `[librenms]`:
+```
+[librenms]
+```
+
+Change `user` and `group` to "librenms":
+```
+user = librenms
+group = librenms
+```
+
+Change `listen` to a unique path that must match your webserver's config (`fastcgi_pass` for NGINX and `SetHandler` for Apache) :
+```
+listen = /run/php-fpm-librenms.sock
+```
+
+If there are no other PHP web applications on this server, you may remove www.conf to save some resources.
+Feel free to tune the performance settings in librenms.conf to meet your needs.
+
+## Configure Web Server
+
+## "Ubuntu 22.04"
+    ## "NGINX"
+        ```bash
+        nano /etc/nginx/conf.d/librenms.conf
+        ```
+
+        Add the following config, edit `server_name` as required:
+
+        ```nginx
+        server {
+         listen      80;
+         server_name librenms.example.com;
+         root        /opt/librenms/html;
+         index       index.php;
+
+         charset utf-8;
+         gzip on;
+         gzip_types text/css application/javascript text/javascript application/x-javascript image/svg+xml text/plain text/xsd text/xsl text/xml image/x-icon;
+         location / {
+          try_files $uri $uri/ /index.php?$query_string;
+         }
+         location ~ [^/]\.php(/|$) {
+          fastcgi_pass unix:/run/php-fpm-librenms.sock;
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          include fastcgi.conf;
+         }
+         location ~ /\.(?!well-known).* {
+          deny all;
+         }
+        }
+        ```
+
+        ```bash
+        rm /etc/nginx/sites-enabled/default
+        systemctl restart nginx
+        systemctl restart php8.1-fpm
+        ```
+
+## "Ubuntu 20.04"
+    ## "NGINX"
+        ```bash
+        nano /etc/nginx/conf.d/librenms.conf
+        ```
+
+        Add the following config, edit `server_name` as required:
+
+        ```nginx
+        server {
+         listen      80;
+         server_name librenms.example.com;
+         root        /opt/librenms/html;
+         index       index.php;
+
+         charset utf-8;
+         gzip on;
+         gzip_types text/css application/javascript text/javascript application/x-javascript image/svg+xml text/plain text/xsd text/xsl text/xml image/x-icon;
+         location / {
+          try_files $uri $uri/ /index.php?$query_string;
+         }
+         location ~ [^/]\.php(/|$) {
+          fastcgi_pass unix:/run/php-fpm-librenms.sock;
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          include fastcgi.conf;
+         }
+         location ~ /\.(?!well-known).* {
+          deny all;
+         }
+        }
+        ```
+
+        ```bash
+        rm /etc/nginx/sites-enabled/default
+        systemctl restart nginx
+        systemctl restart php8.1-fpm
+        ```
+
+    ## "Apache"
+        ```bash
+        nano /etc/apache2/sites-available/librenms.conf
+        ```
+
+        Add the following config, edit `ServerName` as required:
+
+        ```apache
+        <nanortualHost *:80>
+          DocumentRoot /opt/librenms/html/
+          ServerName  librenms.example.com
+
+          AllowEncodedSlashes NoDecode
+          <Directory "/opt/librenms/html/">
+            Require all granted
+            AllowOverride All
+            Options FollowSymLinks Multinanoews
+          </Directory>
+
+          # Enable http authorization headers
+          <IfModule setennanof_module>
+            SetEnnanofNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+          </IfModule>
+
+          <FilesMatch ".+\.php$">
+            SetHandler "proxy:unix:/run/php-fpm-librenms.sock|fcgi://localhost"
+          </FilesMatch>
+        </nanortualHost>
+        ```
+
+        ```bash
+        a2dissite 000-default
+        a2enmod proxy_fcgi setennanof rewrite
+        a2ensite librenms.conf
+        systemctl restart apache2
+        systemctl restart php8.1-fpm
+        ```
+
+## "CentOS 8"
+    ## "NGINX"
+        ```
+        nano /etc/nginx/conf.d/librenms.conf
+        ```
+
+        Add the following config, edit `server_name` as required:
+
+        ```nginx
+        server {
+         listen      80;
+         server_name librenms.example.com;
+         root        /opt/librenms/html;
+         index       index.php;
+
+         charset utf-8;
+         gzip on;
+         gzip_types text/css application/javascript text/javascript application/x-javascript image/svg+xml text/plain text/xsd text/xsl text/xml image/x-icon;
+         location / {
+          try_files $uri $uri/ /index.php?$query_string;
+         }
+         location ~ [^/]\.php(/|$) {
+          fastcgi_pass unix:/run/php-fpm-librenms.sock;
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          include fastcgi.conf;
+         }
+         location ~ /\.(?!well-known).* {
+          deny all;
+         }
+        }
+        ```
+
+        > NOTE: If this is the only site you are hosting on this server (it
+        > should be :)) then you will need to disable the default site.
+
+        Delete the `server` section from `/etc/nginx/nginx.conf`
+        make like this 'sercer{}'
+
+        ```
+        systemctl enable --now nginx
+        systemctl enable --now php-fpm
+        ```
+
+    ## "Apache"
+        Create the librenms.conf:
+
+        ```
+        nano /etc/httpd/conf.d/librenms.conf
+        ```
+
+        Add the following config, edit `ServerName` as required:
+
+        ```apache
+        <nanortualHost *:80>
+          DocumentRoot /opt/librenms/html/
+          ServerName  librenms.example.com
+
+          AllowEncodedSlashes NoDecode
+          <Directory "/opt/librenms/html/">
+            Require all granted
+            AllowOverride All
+            Options FollowSymLinks Multinanoews
+          </Directory>
+
+          # Enable http authorization headers
+          <IfModule setennanof_module>
+            SetEnnanofNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+          </IfModule>
+
+          <FilesMatch ".+\.php$">
+            SetHandler "proxy:unix:/run/php-fpm-librenms.sock|fcgi://localhost"
+          </FilesMatch>
+        </nanortualHost>
+        ```
+
+        > NOTE: If this is the only site you are hosting on this server (it
+        > should be :)) then you will need to disable the default site. `rm -f /etc/httpd/conf.d/welcome.conf`
+
+        ```
+        systemctl enable --now httpd
+        systemctl enable --now php-fpm
+        ```
+
+## "Debian 11"
+    ## "NGINX"
+        ```bash
+        nano /etc/nginx/sites-enabled/librenms.vhost
+        ```
+
+        Add the following config, edit `server_name` as required:
+
+        ```nginx
+        server {
+         listen      80;
+         server_name librenms.example.com;
+         root        /opt/librenms/html;
+         index       index.php;
+
+         charset utf-8;
+         gzip on;
+         gzip_types text/css application/javascript text/javascript application/x-javascript image/svg+xml text/plain text/xsd text/xsl text/xml image/x-icon;
+         location / {
+          try_files $uri $uri/ /index.php?$query_string;
+         }
+         location ~ [^/]\.php(/|$) {
+          fastcgi_pass unix:/run/php-fpm-librenms.sock;
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          include fastcgi.conf;
+         }
+         location ~ /\.(?!well-known).* {
+          deny all;
+         }
+        }
+        ```
+
+        ```bash
+        rm /etc/nginx/sites-enabled/default
+        systemctl reload nginx
+        systemctl restart php8.2-fpm
+        ```
+
+## SELinux
+
+## "Ubuntu 22.04"
+    SELinux not enabled by default
+
+## "Ubuntu 20.04"
+    SELinux not enabled by default
+
+## "CentOS 8"
+    Install the policy tool for SELinux:
+
+    ```
+    dnf install policycoreutils-python-utils
+    ```
+
+    <h3>Configure the contexts needed by LibreNMS</h3>
+
+    ```
+    semanage fcontext -a -t httpd_sys_content_t '/opt/librenms/html(/.*)?'
+    semanage fcontext -a -t httpd_sys_rw_content_t '/opt/librenms/(rrd|storage)(/.*)?'
+    semanage fcontext -a -t httpd_log_t "/opt/librenms/logs(/.*)?"
+    semanage fcontext -a -t bin_t '/opt/librenms/librenms-sernanoce.py'
+    restorecon -RFvv /opt/librenms
+    setsebool -P httpd_can_sendmail=1
+    setsebool -P httpd_execmem 1
+    chcon -t httpd_sys_rw_content_t /opt/librenms/.env
+    ```
+
+    <h3>Allow fping</h3>
+
+    Create the file http_fping.tt with the following contents. You can
+    create this file anywhere, as it is a throw-away file. The last step
+    in this install procedure will install the module in the proper
+    location.
+
+    ```
+    module http_fping 1.0;
+
+    require {
+    type httpd_t;
+    class capability net_raw;
+    class rawip_socket { getopt create setopt write read };
+    }
+
+    #########= httpd_t ########==
+    allow httpd_t self:capability net_raw;
+    allow httpd_t self:rawip_socket { getopt create setopt write read };
+    ```
+
+    Then run these commands
+
+    ```
+    checkmodule -M -m -o http_fping.mod http_fping.tt
+    semodule_package -o http_fping.pp -m http_fping.mod
+    semodule -i http_fping.pp
+    ```
+
+    Additional SELinux problems may be found by executing the following command
+
+    ```
+    audit2why < /var/log/audit/audit.log
+    ```
+
+## "Debian 11"
+    SELinux not enabled by default
+
+## Allow access through firewall
+
+## "Ubuntu 22.04"
+    Firewall not enabled by default
+
+## "Ubuntu 20.04"
+    Firewall not enabled by default
+
+## "CentOS 8"
+
+    ```
+    firewall-cmd --zone public --add-sernanoce http --add-sernanoce https
+    firewall-cmd --permanent --zone public --add-sernanoce http --add-sernanoce https
+    ```
+
+## "Debian 11"
+    Firewall not enabled by default
 
 
-Participating
--------------
+## Enable lnms command completion
 
-You can participate in the project by:
-- Talking to us on [Discord][4] or [Twitter][3].
-- Joining the [LibreNMS Community](https://community.librenms.org)
-- Improving the [documentation][5].
-- Cloning the [repository][2] and filing [pull requests][19] on GitHub.
-- [Bug Reports](https://community.librenms.org) on our Community Forums
-- See [CONTRIBUTING][15] for more details.
+This feature grants you the opportunity to use tab for completion on lnms commands as you would
+for normal linux commands.
 
+```
+ln -s /opt/librenms/lnms /usr/bin/lnms
+cp /opt/librenms/misc/lnms-completion.bash /etc/bash_completion.d/
+```
 
-VM image
---------
+## Configure snmpd
 
-You can try LibreNMS by downloading a VM image.  Currently, a Ubuntu-based
-image is supplied and has been tested with [VirtualBox][8].
+```
+cp /opt/librenms/snmpd.conf.example /etc/snmp/snmpd.conf
+```
 
-Download one of the [VirtualBox images][11] we have available, documentation is provided which details
-login credentials and setup details.
+```
+nano /etc/snmp/snmpd.conf
+```
 
-License
--------
+Edit the text which says `RANDOMSTRINGGOESHERE` and set your own community string.
 
-Copyright (C) 2006-2012 Adam Armstrong <adama@memetic.org>
+```
+curl -o /usr/bin/distro https://raw.githubusercontent.com/librenms/librenms-agent/master/snmp/distro
+chmod +x /usr/bin/distro
+systemctl enable snmpd
+systemctl restart snmpd
+```
 
-Copyright (C) 2013-2023 by individual LibreNMS contributors
+## Cron job
 
- This program is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+```
+cp /opt/librenms/dist/librenms.cron /etc/cron.d/librenms
+```
 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+> NOTE: Keep in mind  that cron, by default, only uses a very limited
+> set of ennanoronment variables. You may need to configure proxy
+> variables for the cron invocation. Alternatively adding the proxy
+> settings in config.php is possible too. The config.php file will be
+> created in the upcoming steps. Renanoew the following URL after you
+> finished librenms install steps:
+> <@= config.site_url =@/Support/Configuration/#proxy-support>
 
- You should have received a copy of the GNU General Public License
- along with this program.  If not, see <https://www.gnu.org/licenses/>.
+## Enable the scheduler
 
-[LICENSE.txt][14] contains a copy of the full GPLv3 licensing conditions.
+```
+cp /opt/librenms/dist/librenms-scheduler.sernanoce /opt/librenms/dist/librenms-scheduler.timer /etc/systemd/system/
 
-The following additional license conditions apply to LibreNMS (a GPL
-exception):
+systemctl enable librenms-scheduler.timer
+systemctl start librenms-scheduler.timer
+```
 
-  As a special exception, you have permission to link or otherwise combine
-  LibreNMS with the included copies of the following third-party software,
-  and distribute modified versions, as long as you follow the requirements
-  of the GNU GPL v3 in regard to all of the remaining software (comprising
-  LibreNMS).
+## Copy logrotate config
 
-  Please see [Acknowledgements][17]
+LibreNMS keeps logs in `/opt/librenms/logs`. Over time these can
+become large and be rotated out.  To rotate out the old logs you can
+use the pronanoded logrotate config file:
 
-[2]: https://github.com/librenms/librenms "Main LibreNMS GitHub repo"
-[3]: https://twitter.com/librenms "@LibreNMS on Twitter"
-[4]: https://discord.gg/librenms "Discord LibreNMS Server"
-[5]: https://github.com/librenms/librenms/tree/master/doc/
-[8]: https://www.virtualbox.org/ "VirtualBox"
-[10]: http://www.debian.org/social_contract "Debian project social contract"
-[11]: https://www.librenms.org/#downloads
-[14]: https://github.com/librenms/librenms/tree/master/LICENSE.txt
-[15]: https://docs.librenms.org/General/Contributing/
-[16]: https://docs.librenms.org/
-[17]: https://docs.librenms.org/General/Acknowledgement/
-[19]: https://github.com/librenms/librenms/pulls
+```
+cp /opt/librenms/misc/librenms.logrotate /etc/logrotate.d/librenms
+```
 
+## Web installer
 
-## Backers
+Now head to the web installer and follow the on-screen instructions.
 
-Support us with a monthly donation and help us continue our activities. [[Become a backer](https://opencollective.com/librenms#backer)]
+<http://librenms.example.com/install>
 
-<a href="https://opencollective.com/librenms/backer/0/website" target="_blank"><img src="https://opencollective.com/librenms/backer/0/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/1/website" target="_blank"><img src="https://opencollective.com/librenms/backer/1/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/2/website" target="_blank"><img src="https://opencollective.com/librenms/backer/2/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/3/website" target="_blank"><img src="https://opencollective.com/librenms/backer/3/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/4/website" target="_blank"><img src="https://opencollective.com/librenms/backer/4/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/5/website" target="_blank"><img src="https://opencollective.com/librenms/backer/5/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/6/website" target="_blank"><img src="https://opencollective.com/librenms/backer/6/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/7/website" target="_blank"><img src="https://opencollective.com/librenms/backer/7/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/8/website" target="_blank"><img src="https://opencollective.com/librenms/backer/8/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/9/website" target="_blank"><img src="https://opencollective.com/librenms/backer/9/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/10/website" target="_blank"><img src="https://opencollective.com/librenms/backer/10/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/11/website" target="_blank"><img src="https://opencollective.com/librenms/backer/11/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/12/website" target="_blank"><img src="https://opencollective.com/librenms/backer/12/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/13/website" target="_blank"><img src="https://opencollective.com/librenms/backer/13/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/14/website" target="_blank"><img src="https://opencollective.com/librenms/backer/14/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/15/website" target="_blank"><img src="https://opencollective.com/librenms/backer/15/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/16/website" target="_blank"><img src="https://opencollective.com/librenms/backer/16/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/17/website" target="_blank"><img src="https://opencollective.com/librenms/backer/17/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/18/website" target="_blank"><img src="https://opencollective.com/librenms/backer/18/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/19/website" target="_blank"><img src="https://opencollective.com/librenms/backer/19/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/20/website" target="_blank"><img src="https://opencollective.com/librenms/backer/20/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/21/website" target="_blank"><img src="https://opencollective.com/librenms/backer/21/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/22/website" target="_blank"><img src="https://opencollective.com/librenms/backer/22/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/23/website" target="_blank"><img src="https://opencollective.com/librenms/backer/23/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/24/website" target="_blank"><img src="https://opencollective.com/librenms/backer/24/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/25/website" target="_blank"><img src="https://opencollective.com/librenms/backer/25/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/26/website" target="_blank"><img src="https://opencollective.com/librenms/backer/26/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/27/website" target="_blank"><img src="https://opencollective.com/librenms/backer/27/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/28/website" target="_blank"><img src="https://opencollective.com/librenms/backer/28/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/backer/29/website" target="_blank"><img src="https://opencollective.com/librenms/backer/29/avatar.svg"></a>
+The web installer might prompt you to create a `config.php` file in
+your librenms install location manually, copying the content displayed
+on-screen to the file. If you have to do this, please remember to set
+the permissions on config.php after you copied the on-screen contents
+to the file. Run:
 
+```
+chown librenms:librenms /opt/librenms/config.php
+```
 
-## Sponsors
+## Final steps
 
-Become a sponsor and get your logo on our README on GitHub with a link to your site. [[Become a sponsor](https://opencollective.com/librenms#sponsor)]
+That's it!  You now should be able to log in to
+<http://librenms.example.com/>.  Please note that we have not covered
+ HTTPS setup in this example, so your LibreNMS install is not secure
+ by default.  Please do not expose it to the public Internet unless
+ you have configured HTTPS and taken appropriate web server hardening
+ steps.
 
-<a href="https://opencollective.com/librenms/sponsor/0/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/0/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/1/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/1/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/2/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/2/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/3/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/3/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/4/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/4/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/5/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/5/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/6/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/6/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/7/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/7/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/8/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/8/avatar.svg"></a>
-<a href="https://opencollective.com/librenms/sponsor/9/website" target="_blank"><img src="https://opencollective.com/librenms/sponsor/9/avatar.svg"></a>
+## Add the first denanoce
 
+We now suggest that you add localhost as your first denanoce from within the WebUI.
 
+## Troubleshooting
+
+If you ever have issues with your install, run validate.php:
+
+```
+sudo su - librenms
+./validate.php
+```
+
+There are various options for getting help listed on the LibreNMS web
+site: <https://www.librenms.org/#support>
+
+## What next?
+
+Now that you've installed LibreNMS, we'd suggest that you have a read
+of a few other docs to get you going:
+
+- [Performance tuning](../Support/Performance.md)
+- [Alerting](../Alerting/index.md)
+- [Denanoce Groups](../Extensions/Denanoce-Groups.md)
+- [Auto discovery](../Extensions/Auto-Discovery.md)
+
+## Closing
+
+We hope you enjoy using LibreNMS. If you do, it would be great if you
+would consider opting into the stats system we have, please see [this
+page](../General/Callback-Stats-and-Privacy.md) on
+what it is and how to enable it.
+
+If you would like to help make LibreNMS better there are [many ways to
+help](../Support/FAQ.md#a-namefaq9-what-can-i-do-to-help). You
+can also [back LibreNMS on Open Collective](https://t.libren.ms/donations).
